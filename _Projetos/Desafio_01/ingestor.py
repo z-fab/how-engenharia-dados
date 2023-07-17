@@ -10,8 +10,9 @@ logging.basicConfig(level=logging.INFO)
 
 class DataIngestor(ABC):
         
-    def __init__(self, writer:DataWriter, default_start_date: datetime.date) -> None:
-        self.default_start_date = default_start_date
+    def __init__(self, writer:DataWriter, start_date: datetime.date, end_date: datetime.date) -> None:
+        self.start_date = start_date
+        self.end_date = end_date
         self.writer = writer
         self._checkpoint = self._load_checkpoint()
     
@@ -32,7 +33,7 @@ class DataIngestor(ABC):
         
     def _get_checkpoint(self):
         if not self._checkpoint:
-            return self.default_start_date
+            return self.start_date
         return self._checkpoint
     
     def _update_checkpoint(self, value):
@@ -46,9 +47,10 @@ class DataIngestor(ABC):
 
 class OrderIngestor(DataIngestor):
     
-    def __init__(self, writer: DataWriter, default_start_date: datetime.date) -> None:
-        super().__init__(writer, default_start_date)
-        self.default_start_date = default_start_date
+    def __init__(self, writer: DataWriter, start_date: datetime.date, end_date: datetime.date) -> None:
+        super().__init__(writer, start_date, end_date)
+        self.start_date = start_date
+        self.end_date = end_date
         self.writer = writer
         self.schema_name = 'marketplace'
         self.table_name = 'order'
@@ -56,8 +58,8 @@ class OrderIngestor(DataIngestor):
     
     def ingest(self) -> None:
         date = self._get_checkpoint()
-        if date < datetime.date.today():
-            logger.info(f"Start Ingestion to S3 -> {date}")
+        if date <= self.end_date:
+            logger.info(f"\nStart Ingestion {date}")
             order_data = OrderData()
             data = order_data.get_data(date=date)
             self.writer(schema_name = self.schema_name, table_name = self.table_name).write(data=data, date=date)

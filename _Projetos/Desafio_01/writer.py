@@ -1,6 +1,6 @@
 import datetime
+import os
 import pandas as pd
-
 
 import boto3
 from botocore import exceptions
@@ -18,12 +18,7 @@ class DataWriter(ABC):
     
     def __init__(self, schema_name:str, table_name:str) -> None:
         self.filepath = f"{schema_name}/{table_name}/"
-        self.s3_client = boto3.client(
-            's3',
-            aws_access_key_id = getenv('AWS_ID'),
-            aws_secret_access_key = getenv('AWS_KEY'),
-        )
-            
+
     @abstractmethod
     def write(self, data:pd.DataFrame, date:datetime.date):
         pass
@@ -32,6 +27,11 @@ class BucketWriter(DataWriter):
     
     def __init__(self, schema_name:str, table_name:str) -> None:
         super().__init__(schema_name, table_name)
+        self.s3_client = boto3.client(
+            's3',
+            aws_access_key_id = getenv('AWS_ID'),
+            aws_secret_access_key = getenv('AWS_KEY'),
+        )
         self.bucket = 'zfab-s3-bucket-how'
     
     def write(self, data:pd.DataFrame, date:datetime.date):
@@ -44,3 +44,24 @@ class BucketWriter(DataWriter):
             Bucket=self.bucket,
             Key= full_path
         )
+        
+class LocalWriter(DataWriter):
+    
+    def __init__(self, schema_name:str, table_name:str) -> None:
+        super().__init__(schema_name, table_name)
+        self.folder = 'output/'
+    
+    def write(self, data:pd.DataFrame, date:datetime.date):
+        path_folder = os.path.join(self.folder, self.filepath) 
+        path_partition = os.path.join(path_folder, f"date-order={date.strftime('%Y-%m-%d')}")
+        file_name = f"{datetime.datetime.now()}.json"
+        
+        if not os.path.exists(path_partition):
+            os.makedirs(path_partition)
+
+        path_full = os.path.join(path_partition, file_name)
+        
+        
+        logger.info(f"Writing to local at {path_full}")
+
+        data.to_json(path_full, orient='records', lines=True)
