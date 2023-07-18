@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 import datetime
 import logging
-from writer import DataWriter
-from generator import OrderData
+from libs.writer import DataWriter
+from libs.generator import OrderData
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

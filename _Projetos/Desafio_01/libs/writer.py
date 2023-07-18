@@ -3,8 +3,6 @@ import os
 import pandas as pd
 
 import boto3
-from botocore import exceptions
-from botocore.exceptions import ClientError
 
 from abc import ABC, abstractmethod
 from io import BytesIO
@@ -36,6 +34,7 @@ class BucketWriter(DataWriter):
     
     def write(self, data:pd.DataFrame, date:datetime.date):
         full_path = self.filepath + f"date-order={date.strftime('%Y-%m-%d')}/{datetime.datetime.now()}.parquet"
+        
         logger.info(f"Writing to S3 at {full_path}")
         out_buffer = BytesIO()
         data.to_parquet(out_buffer, index=False)
