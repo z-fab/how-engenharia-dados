@@ -1,7 +1,10 @@
-# How Fake Accounts
-ALTERAR....
+# Howbootcamp - Fake Generator
 
-Esse projeto é a solução para o primeiro desafio do bootcamp da How de engenharia de dados, que consiste na construção de um pipeline de dados com os seguintes passos:
+Esse repositório contém a resolução do primeiro desafio do bootcamp de Engenharia de Dados da Howbootcamp.
+
+O objetivo desse desafio consistia na geração de dados falsos e ingestão deles em um bucket S3 da AWS. Após a ingestão era preciso gerar através de um Crawler (AWS Glue) a tabela com os dados para consulta na AWS Athena.
+
+Etapas:
 
 1. Criar uma conta AWS
 2. Gerar dados necessários utilizando a biblioteca Faker do Python
@@ -9,110 +12,89 @@ Esse projeto é a solução para o primeiro desafio do bootcamp da How de engenh
 4. Criar um Crawler dos dados com o AWS Glue
 5. Escrever 3 consultas nos dados utilizando o AWS Athena
 
-### Arquitetura da Solução
+## Contexto
 
-![](imgs/how-arquitetura-desafio01.png)
+Para o desafio foi proposto o cenário de um Marketplace web onde empresas vendem seus produtos. Os dados gerados são os pedidos realizados em uma determinada data.
 
-- O pacote `how-fake-accounts` é utilizado para simular a criação de contas aleatórias
-- O código localizado em [pipelines/ingestion_pipeline.py](pipelines/ingestion_pipeline.py) pega os dados de cadastros realizados e faz o upload deles no S3
-- O Github Actions é utilizado para schedular um job que consiste em executar o código de ingestão anterior de hora em hora. Isso é feito através do arquivo [.github/workflows/ingestion_pipeline.yaml](.github/workflows/ingestion_pipeline.yaml). **This pipeline takes in the created accounts for the past hour and ingest them into an S3 bucket**. 
-- Um Crawler é criado com o AWS Glue para gerar os metados necessários para criar tabelas a partir dos arquivos no bucket
-- O Athena é utilizado para fazer as consultas
+|Campo|Descrição|
+|--|--|
+|date_order|Data do pedido|
+|seller|Nome da empresa vendedora|
+|customer|Nome do comprador|
+|qtd_itens|Quantidade de itens comprados|
+|order_value|Valor da compra|
+|freight_value|Valor do frete|
+|delivery_address|Endereço de entrega|
+|delivery_type|Tipo de entrega|
+|delivery_date|Previsão de entrega|
+|payment_type|Tipo de pagamento|
+|order_status|Situação do pedido|
+
+
+## Arquitetura da Solução
+
+![Diagrama da arquitetura da solução](img/arquitetura_solucao.jpg)
+
+- O arquivo [main.py](main.py) é responsável executar a ingestão ao ser executada por linha de comando
+- O arquivo [ingestor.py](libs/ingestor.py) contem as classes responsáveis pelo processo de ingestão dos dados
+- O arquivo [generator.py](libs/generator.py) contem a classe responsável por gerar as informações fakes utilizando a biblioteca [Faker](https://faker.readthedocs.io/en/master/#how-to-create-a-provider)
+- O arquivo [writer.py](libs/writer.py) contem as classes responsáveis por salvar os dados, seja localmente em formato JSON ou na AWS S3 através da biblioteca Boto3
+- Um Crawler do AWS Glue é criado para criar (ou atualizar) tabelas com base nos arquivos adicionados no bucket S3
+- O AWS Athena utiliza o catálogo (metadados) criado para realizar as consultas nos dados salvo no S3
 
 
 
-## Criar uma conta AWS
+## Scripts
 
-Nesse caso, basta ir em https://portal.aws.amazon.com/billing/signup e preencher com as informações solicitadas para a criação de uma conta.
+Para gerar e fazer a ingestão dos dados basta rodar o script `main.py` passando alguns parametros:
 
-## Gerar dados necessários utilizando a biblioteca Faker do Python
+|Parâmetro|Descrição|Formato / Opções|
+|--|--|--|
+|**`-start` ou `-s`**|Data de Início|`%Y-%m-%d`
+|**`-end` ou `-e`**|Data de Fim|`%Y-%m-%d`
+|**`-type` ou `-t`**|Local de ingestão|`local` ou `S3`|
 
-Utilizando a funcionalidade de customização de providers da biblioteca [Faker](https://faker.readthedocs.io/en/master/#how-to-create-a-provider), criei um pacote python chamado `how-fake-accounts` que gera uma tabela com contas brasileiras fakes. O pacote está localizado nesse repositório na pasta `how_fake_accounts` e pode ser instalado via `pip install how-fake-accounts`. A funcionalidade principal do pacote está no arquivo `how_fake_accounts/core.py`.
-
-As contas feitas simulam o cadastro de usuários em um site e contém as seguintes informações para cada usuário cadastrado:
-
-- nome
-- email
-- número de telefone
-- cpf
-- data de nascimento
-- endereço
-- emprego
-
-## Armazenar os dados em um bucket do AWS S3
-
-Criei um bucket no AWS S3 que chamei de `${AWS::AccountId}-landing-zone` e uma pasta dentro do bucket `desafio-01/fake-accounts/`. O nome da pasta mais o nome do arquivo que será jogado no S3 compõe a key.
-
-Escrevi um script python localizado em `pipelines/ingestion_pipeline.py` que gera contas de cadastros aleatórias com a bibioteca `how-fake-accounts` e faz o upload para o AWS S3 com o `awswrangler` em formato parquet.
-
-Esse mesmo script é executada de hora em hora em um workflow do Github Actions, simulando assim a ingestão de dados novos no AWS S3. O contexto simulado aqui é a ingestão de novas contas criadas em um site na última hora.
-
-![](imgs/aws-s3-bucket.png)
-
-## Criar um Crawler dos dados com o AWS Glue
-
-Criei um Crawler apontando para a pasta onde os arquivos estão no S3 e schedulei para o mesmo rodar a cada hora no minuto 10. Como o pipeline de ingestão do Github Actions executada sempre no minuto 0 e dura menos de 1 minutos, assim garanto que sempre que o Crawler rodar, irá encontrar novos arquivos.
-
-![](imgs/aws-glue-crawler.png)
-
-## Escrever 3 consultas nos dados utilizando o AWS Athena
-
-Com a tabela criada, foi possível realizar queries com o Athena.
-
-Segue abaixo alguns screenshots e consultas realizadas
-
-![](imgs/aws-athena-query1.png)
-![](imgs/aws-athena-query2.png)
-![](imgs/aws-athena-query3.png)
-
-# Próximos Passos
-- [ ] Mover os dados da camada landing-zone para uma camada bronze, onde os dados de cpf estariam criptografados.
-- [ ] Escrever todos os serviços em Cloud Formation [cf_project_aws_resources.yaml](cf_project_aws_resources.yaml)
-    - [x] AWS S3 (criação do bucket)
-    - [ ] AWS Glue (crawler)
-- [ ] Restringir acesso a camada landing-zone apenas aos super usuários (o usuário missy, por exemplo, não deve ter acesso a esse bucket, apenas a partir do bucket bronze)
-
-  
-# Sobre o Pacote
-
-## How to install
+Exemplo de execução
 
 ```bash
-pip install how-fake-accounts
+python3 main.py -s '01-07-2023' -e '31-07-2023' -t 'S3'
 ```
 
-## How to use
+## AWS S3
 
-We have mainly two ways to use the package:
-- as a package itself, to be imported in python scripts
-- as a command line interface
+![Bucket S3](img/s3.png)
 
-### Package Interface
+Os dados gerados são salvos em um bucket chamado `zfab-s3-bucket-how` e na pasta `marketplace`. Dentro é separado por `<schema name>` e particionado por `data de pedido` (no caso dos dados de exemplo do script).
 
-```python
-import os
-from datetime import datetime
-from how_fake_accounts import fake
+A ingestão no bucket é feito através da biblioteca Boto3. Caso o bucket não exista ele é criado automaticamente
 
-# generate 10 random accounts
-accounts = fake.generate_accounts(10)
-accounts.head()
-```
+## AWS Glue
 
-### CLI Interface
+![Crawler Glue](img/glue.png)
 
-To generate 50 accounts, just type into terminal:
+Um Crawler foi criado no AWS Glue para geração automática dos schemas e partições com base nos dados salvos no bucket S3.
 
-```bash
-how_fake --n-accounts 50
-```
-or
-```bash
-python -m how_fake --n-accounts 50
-```
+No exemplo criado o crawler roda manualmente porém é possível configura-lo para executar sempre que novos arquivos são adicionados ou em uma cadência pré-definida.
 
-for help, just type:
+## AWS Athena
 
-```bash
-how_fake --help
-```
+Com o schema criado pelo Crawler do AWS Glue é possível realizar consultas nos dados salvos no bucket S3 utilizando o AWS Athena.
+
+Foram feitas três consultas de exemplo:
+
+1. Quantidade de Pedidos por dia agrupados por Situação:
+
+
+![](img/query_status.png)
+![](img/resultado_status.png)
+
+2. Quantidade de Pedidos e Total de vendas realizado por cada vendedor:
+
+![](img/query_venda.png)
+![](img/resultado_venda.png)
+
+3. Média de valor de pedidos por tipo de pagamento:
+
+![](img/query_media_valor.png)
+![](img/resultado_media_valor.png)
+
