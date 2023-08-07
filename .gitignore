@@ -2,6 +2,7 @@
 */content/*
 */db
 *.checkpoint
+*/src
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
